@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:developer';
+import 'dart:math';
 
 import 'package:bloc/bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:meta/meta.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../product/components/coordinate_translator.dart';
@@ -19,6 +18,77 @@ class GameBoardCubit extends Cubit<GameBoardState> {
   GameBoardCubit() : super(GameBoardInitial()) {
     // customInit();
   }
+
+  ///
+  ///
+  Timer? barrierTimer;
+
+  late double barrierXOnePixel;
+  late double barrierXTwoPixel;
+  late double barrierXThreePixel;
+  late double barrierYOnePixel;
+  late double barrierYTwoPixel;
+  late double barrierYThreePixel;
+  void setBuildContext(BuildContext context) {
+    buildContext = context;
+  }
+
+  void customInit(BuildContext context) {
+    setBuildContext(context);
+    barrierXOnePixel = MediaQuery.of(context).size.width;
+    barrierXTwoPixel = MediaQuery.of(context).size.width * 1.8;
+    barrierXThreePixel = MediaQuery.of(context).size.width * 2.6;
+    double height = MediaQuery.of(context).size.height;
+
+    barrierYOnePixel =
+        height * .15 + Random().nextInt((height * .5).toInt()).toDouble();
+    barrierYTwoPixel =
+        height * .15 + Random().nextInt((height * .5).toInt()).toDouble();
+    barrierYThreePixel =
+        height * .15 + Random().nextInt((height * .5).toInt()).toDouble();
+  }
+
+  void startGame() {
+    gameStarted = true;
+    barrierTimer = Timer.periodic(const Duration(milliseconds: 10), (timer) {
+      moveBarrier();
+      checkGame();
+    });
+  }
+
+  void moveBarrier() {
+    double width = MediaQuery.of(buildContext!).size.width;
+    double height = MediaQuery.of(buildContext!).size.height;
+
+    if (barrierXOnePixel < -width * 0.2) {
+      barrierXOnePixel = width * 2;
+      barrierYOnePixel =
+          height * .15 + Random().nextInt((height * .6).toInt()).toDouble();
+    } else {
+      barrierXOnePixel -= 2;
+    }
+
+    if (barrierXTwoPixel < -width * 0.2) {
+      barrierXTwoPixel = width * 2;
+      barrierYTwoPixel =
+          height * .15 + Random().nextInt((height * .6).toInt()).toDouble();
+    } else {
+      barrierXTwoPixel -= 2;
+    }
+
+    if (barrierXThreePixel < -width * 0.2) {
+      barrierXThreePixel = width * 2;
+      barrierYThreePixel =
+          height * .15 + Random().nextInt((height * .6).toInt()).toDouble();
+    } else {
+      barrierXThreePixel -= 2;
+    }
+    emit(GameBoardInitial());
+  }
+
+  ///
+  ///
+
   BuildContext? buildContext;
   bool gameStarted = false;
 
@@ -39,10 +109,6 @@ class GameBoardCubit extends Cubit<GameBoardState> {
   bool isCountedTwo = false;
   bool isCountedThree = false;
 
-  void setBuildContext(BuildContext context) {
-    buildContext = context;
-  }
-
   InputImage? inputImage;
   List<Offset> writeTrial = [];
   final faceDetector = FaceDetector(
@@ -60,31 +126,19 @@ class GameBoardCubit extends Cubit<GameBoardState> {
   bool isTopPass = false;
   int count = 0;
 
-  customInit() {
-    start();
-  }
+  void checkGame() async {
+    _onCheckPassed();
+    bool isFinish = checkFinish();
+    if (isFinish) {
+      final prefs = await SharedPreferences.getInstance();
 
-  late Timer timerForFaceDetection;
-  start() {
-    timerForFaceDetection =
-        Timer.periodic(const Duration(milliseconds: 100), (Timer t) async {
-      if (inputImage != null) {
-        await processImageFace(inputImage!);
+      final int? bestScore = prefs.getInt(Pref.bestScore.name);
+      if (bestScore == null) {
+        prefs.setInt(Pref.bestScore.name, count);
+      } else if (bestScore < count) {
+        prefs.setInt(Pref.bestScore.name, count);
       }
-
-      _onCheckPassed();
-      bool isFinish = checkFinish();
-      if (isFinish) {
-        final prefs = await SharedPreferences.getInstance();
-
-        final int? bestScore = prefs.getInt(Pref.bestScore.name);
-        if (bestScore == null) {
-          prefs.setInt(Pref.bestScore.name, count);
-        } else if (bestScore < count) {
-          prefs.setInt(Pref.bestScore.name, count);
-        }
-      }
-    });
+    }
   }
 
   Offset? currentBirdOffset;
@@ -94,7 +148,12 @@ class GameBoardCubit extends Cubit<GameBoardState> {
   int x = 1;
   //nose y axis position
   int y = 1;
+  bool isBusy = false;
   Future<void> processImageFace(InputImage inputImage) async {
+    if (isBusy) return;
+    // moveBarrier();
+
+    isBusy = true;
     try {
       final List<Face> faces = await faceDetector.processImage(inputImage);
       this.inputImage = inputImage;
@@ -160,14 +219,17 @@ class GameBoardCubit extends Cubit<GameBoardState> {
         text = 'Poses found: ${faces.length}\n\n';
         customPaint = null;
       }
+
       emit(GameBoardInitial());
     } catch (e) {
-      // print("1111" * 50);
+      isBusy = false;
     }
+    isBusy = false;
   }
 
   final Size size1NoseBox = const Size(15.0, 15.0);
 
+  //TODO: BURDA ISCOUNTEDONE A GEREK VAR MI CONTROLL ET
   bool checkFinish() {
     if (!gameStarted) return false;
 
@@ -179,9 +241,9 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           MediaQuery.of(buildContext!).size; //?? const Size(360.0, 780.0);
 
       final position2 = box2.localToGlobal(Offset.zero);
-      if (position2.dx < 0) {
-        isCountedOne = false;
-      }
+      // if (position2.dx < 0) {
+      //   isCountedOne = false;
+      // }
 
       Offset position1 = Offset(
           translateX(
@@ -199,9 +261,8 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           position1.dy < position2.dy + size2.height &&
           position1.dy + size1NoseBox.height > position2.dy);
 
-      //   print('Containers collide: $collide');
       if (collide == true) {
-        isCountedOne = true;
+        //  isCountedOne = true;
         emit(GameBoardCompleted());
         return true;
       }
@@ -214,9 +275,9 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           MediaQuery.of(buildContext!).size; //?? const Size(360.0, 780.0);
 
       final position2 = box2.localToGlobal(Offset.zero);
-      if (position2.dx < 0) {
-        isCountedOne = false;
-      }
+      // if (position2.dx < 0) {
+      //   isCountedOne = false;
+      // }
 
       Offset position1 = Offset(
           translateX(
@@ -234,9 +295,8 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           position1.dy < position2.dy + size2.height &&
           position1.dy + size1NoseBox.height > position2.dy);
 
-      //   print('Containers collide: $collide');
       if (collide == true) {
-        isCountedOne = true;
+        // isCountedOne = true;
         emit(GameBoardCompleted());
         return true;
       }
@@ -249,9 +309,9 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           MediaQuery.of(buildContext!).size; //?? const Size(360.0, 780.0);
 
       final position2 = box2.localToGlobal(Offset.zero);
-      if (position2.dx < 0) {
-        isCountedOne = false;
-      }
+      // if (position2.dx < 0) {
+      //   isCountedOne = false;
+      // }
 
       Offset position1 = Offset(
           translateX(
@@ -269,9 +329,8 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           position1.dy < position2.dy + size2.height &&
           position1.dy + size1NoseBox.height > position2.dy);
 
-      //   print('Containers collide: $collide');
       if (collide == true) {
-        isCountedOne = true;
+        //  isCountedOne = true;
         emit(GameBoardCompleted());
         return true;
       }
@@ -284,9 +343,9 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           MediaQuery.of(buildContext!).size; //?? const Size(360.0, 780.0);
 
       final position2 = box2.localToGlobal(Offset.zero);
-      if (position2.dx < 0) {
-        isCountedOne = false;
-      }
+      // if (position2.dx < 0) {
+      //   isCountedOne = false;
+      // }
 
       Offset position1 = Offset(
           translateX(
@@ -304,9 +363,8 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           position1.dy < position2.dy + size2.height &&
           position1.dy + size1NoseBox.height > position2.dy);
 
-      //   print('Containers collide: $collide');
       if (collide == true) {
-        isCountedOne = true;
+        // isCountedOne = true;
         emit(GameBoardCompleted());
         return true;
       }
@@ -319,9 +377,9 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           MediaQuery.of(buildContext!).size; //?? const Size(360.0, 780.0);
 
       final position2 = box2.localToGlobal(Offset.zero);
-      if (position2.dx < 0) {
-        isCountedOne = false;
-      }
+      // if (position2.dx < 0) {
+      //   isCountedOne = false;
+      // }
 
       Offset position1 = Offset(
           translateX(
@@ -339,9 +397,8 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           position1.dy < position2.dy + size2.height &&
           position1.dy + size1NoseBox.height > position2.dy);
 
-      //   print('Containers collide: $collide');
       if (collide == true) {
-        isCountedOne = true;
+        //  isCountedOne = true;
         emit(GameBoardCompleted());
         return true;
       }
@@ -354,9 +411,9 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           MediaQuery.of(buildContext!).size; //?? const Size(360.0, 780.0);
 
       final position2 = box2.localToGlobal(Offset.zero);
-      if (position2.dx < 0) {
-        isCountedOne = false;
-      }
+      //   if (position2.dx < 0) {
+      //     isCountedOne = false;
+      //   }
 
       Offset position1 = Offset(
           translateX(
@@ -374,9 +431,8 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           position1.dy < position2.dy + size2.height &&
           position1.dy + size1NoseBox.height > position2.dy);
 
-      //   print('Containers collide: $collide');
       if (collide == true) {
-        isCountedOne = true;
+        //   isCountedOne = true;
         emit(GameBoardCompleted());
         return true;
       }
@@ -414,12 +470,12 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           position1.dy < position2.dy + size2.height &&
           position1.dy + size1NoseBox.height > position2.dy);
 
-      //   print('Containers collide: $collide');
       if (!isCountedOne) {
         if (collide == true) {
           isCountedOne = true;
 
           count++;
+
           emit(GameBoardInitial());
         }
       }
@@ -452,12 +508,12 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           position1.dy < position2.dy + size2.height &&
           position1.dy + size1NoseBox.height > position2.dy);
 
-      //   print('Containers collide: $collide');
       if (!isCountedTwo) {
         if (collide == true) {
           isCountedTwo = true;
 
           count++;
+
           emit(GameBoardInitial());
         }
       }
@@ -490,12 +546,12 @@ class GameBoardCubit extends Cubit<GameBoardState> {
           position1.dy < position2.dy + size2.height &&
           position1.dy + size1NoseBox.height > position2.dy);
 
-      //   print('Containers collide: $collide');
       if (!isCountedThree) {
         if (collide == true) {
           isCountedThree = true;
 
           count++;
+
           emit(GameBoardInitial());
         }
       }

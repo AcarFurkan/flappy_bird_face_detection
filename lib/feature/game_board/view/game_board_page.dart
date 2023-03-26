@@ -11,20 +11,30 @@ class GameBoardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider<GameBoardCubit>(
       create: ((context) => GameBoardCubit()),
-      child: BlocBuilder<GameBoardCubit, GameBoardState>(
-        builder: (context, state) {
-          context.read<GameBoardCubit>().setBuildContext(context);
-          return GameBoardView(
-            title: 'Pose Detector',
-            customPaint: context.read<GameBoardCubit>().customPaint,
-            text: context.read<GameBoardCubit>().text,
-            bodyText: context.read<GameBoardCubit>().count.toString(),
-            onImage: (inputImage) async {
-              context.read<GameBoardCubit>().inputImage = inputImage;
-            },
-          );
-        },
-      ),
+      child: const GameBoardBuilder(),
+    );
+  }
+}
+
+class GameBoardBuilder extends StatelessWidget {
+  const GameBoardBuilder({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    context.read<GameBoardCubit>().customInit(context);
+    debugPrint("1-GameBoardViewBuilder");
+    return GameBoardView(
+      title: 'Pose Detector',
+      customPaint: context.read<GameBoardCubit>().customPaint,
+      text: context.read<GameBoardCubit>().text,
+      onImage: (inputImage) async {
+        if (!context.read<GameBoardCubit>().isBusy) {
+          context.read<GameBoardCubit>().processImageFace(inputImage);
+        }
+        //  context.read<GameBoardCubit>().inputImage = inputImage;
+      },
     );
   }
 }
