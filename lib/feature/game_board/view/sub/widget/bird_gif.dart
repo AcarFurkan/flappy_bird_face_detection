@@ -8,9 +8,9 @@ class BuildBirdGif extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      "assets/gif/new_bird_high.gif",
+      "assets/gif/new_anim.gif",
       key: context.read<GameBoardCubit>().customerPainterKey,
-      width: 120,
+      width: 175,
       fit: BoxFit.fitWidth,
     );
   }

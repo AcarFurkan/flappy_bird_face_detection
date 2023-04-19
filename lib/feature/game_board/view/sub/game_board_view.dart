@@ -50,7 +50,6 @@ class _GameBoardViewState extends State<GameBoardView>
   @override
   void initState() {
     super.initState();
-
     timerForStart = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (timer.tick == 3) {
         context.read<GameBoardCubit>().startGame();

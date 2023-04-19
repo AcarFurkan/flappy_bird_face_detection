@@ -145,7 +145,8 @@ class BuildLiveBody extends StatelessWidget {
       context.read<GameBoardCubit>().barrierTimer?.cancel();
       await context.read<GameBoardCubit>().faceDetector.close();
       await context.read<GameBoardCubit>().close();
-
+//APPSTORE_KEY_ID= FHV6H7LPL8
+//APPSTORE_ISSUER_ID= 57e879b1-05dc-475a-aaf8-a41aa8cf1152
       await controller?.pausePreview();
       // ignore: use_build_context_synchronously
       await AwesomeDialog(
