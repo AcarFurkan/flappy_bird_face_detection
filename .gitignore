@@ -131,3 +131,4 @@ app.*.symbols
 !/dev/ci/**/Gemfile.lock
 ios/Runner.ipa
 ios/fastlane/.env.default
+ios/fastlane/Appfile

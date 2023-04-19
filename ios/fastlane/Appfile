@@ -2,6 +2,7 @@ app_identifier("com.acar.dashFaceDetection") # The bundle identifier of your app
 apple_id("furkanacr911@gmail.com") # Your Apple Developer Portal username
 
 itc_team_id("124225761") # App Store Connect Team ID
+
 team_id("H3SKW97C5C") # Developer Portal Team ID
 
 # For more information about the Appfile, see:
